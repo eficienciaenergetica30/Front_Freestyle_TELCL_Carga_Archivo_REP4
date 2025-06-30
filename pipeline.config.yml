@@ -1,0 +1,29 @@
+general:
+  verbose: true
+ 
+stages:
+  - name: Build
+    type: mtaBuild
+    parameters:
+      mtaBuildTool: "classic"
+ 
+  - name: Deploy to Dev
+    type: cfDeploy
+    parameters:
+      cfApiEndpoint: "https://api.cf.us10.hana.ondemand.com"
+      org: "TELCL"
+      space: "DEV"
+      credentialsId: "cloud-foundry-ee-credentials"
+ 
+  - name: Approval Before Prd
+    type: approval
+    parameters:
+      message: "¿Aprobar despliegue a producción?"
+ 
+  - name: Deploy to Prd
+    type: cfDeploy
+    parameters:
+      cfApiEndpoint: "https://api.cf.us10.hana.ondemand.com"
+      org: "TELCL"
+      space: "PRD"
+      credentialsId: "cloud-foundry-ee-credentials"
