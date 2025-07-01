@@ -196,7 +196,7 @@ async function postSite(data, number) {
 async function activateFactFlow() {
   const FLOW_NAME = "TLCL01_Carga_Datos_Facturacion_Electrica_Prd";
   const MAX_RETRIES = 3;
-  const RETRY_DELAY = 2000; // 2 segundos
+  const RETRY_DELAY = 2000; // 2 segundos mas o menos
 
   let retryCount = 0;
 
