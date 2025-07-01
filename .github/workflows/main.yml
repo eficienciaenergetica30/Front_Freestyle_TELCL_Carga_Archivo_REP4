@@ -44,7 +44,7 @@ jobs:
           MTA_FILE="mta.yaml"
           if [ -f "$MTA_FILE" ]; then
             echo "Reemplazando xsappname en $MTA_FILE..."
-            sed -i 's|xsappname: "cargaarchivoplano_dev"|xsappname: "cargaarchivoplano_prd"|g' "$MTA_FILE"
+            sed -i 's|xsappname: "cargaarchivorep4_dev"|xsappname: "cargaarchivorep4_prd"|g' "$MTA_FILE"
           else
             echo "⚠️ Archivo no encontrado: $MTA_FILE"
           fi
