@@ -25,6 +25,20 @@ const monthList = [
 $(document).ready(function () {
   console.log("Last Code Update: " + new Date().toLocaleDateString());
 
+  // Proveedor
+  $(".provider-switches input").on("click", function () {
+    if ($(this).prop("disabled")) return; // Evita interacción si está bloqueado
+    selectProvider($(this).val());
+  });
+
+  // Fecha
+  $("#fecha").on("change", function () {
+    if ($(this).prop("disabled")) return; // Evita interacción si está bloqueado
+    fechaSeleccionada = $(this).val();
+    console.log("Fecha seleccionada:", fechaSeleccionada);
+  });
+
+
   // Deshabilitar controles inicialmente
   $(".provider-switches input, #submit").prop("disabled", true);
   $("#progress-bar-indicator").hide();
@@ -93,9 +107,11 @@ function handleFileUpload(e) {
     const obj = JSON.parse(response);
 
     // Activar controles
+    // Activar controles
     $(".provider-switches input, #submit").prop("disabled", false);
     $("div:nth-child(2)").prop("disabled", false);
     $("div:nth-child(2) *").prop("disabled", false);
+
 
     if (fechaSeleccionada) {
       const fecha = new Date(fechaSeleccionada);
@@ -223,7 +239,7 @@ function setMonth(fecha) {
 function cleanTable() {
   $("#tbl-data").empty();
   $("#totalConsumo").empty();
-  $(".provider-switches input").prop("checked", false).prop("disabled", true);
+  $(".provider-switches input, #submit, #fecha").prop("disabled", true);
   $("#submit").prop("disabled", true);
   $("#fecha").val("");
 

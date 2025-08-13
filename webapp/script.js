@@ -5,101 +5,90 @@ async function getTableData() {
     return;
   }
 
-  if (!fechaSeleccionada) {
-    alert("Seleccione la fecha de facturación del archivo.");
+  if (!fechaSeleccionada || !/^\d{4}-\d{2}$/.test(fechaSeleccionada)) {
+    alert("Seleccione la fecha de facturación en formato AAAA-MM");
     return;
   }
 
-  if (!fechaSeleccionada) {
-    alert("Seleccione el mes y año de facturación.");
-    return;
-  }
-
-  // Validar formato de fecha (YYYY-MM)
-  const fechaRegex = /^\d{4}-\d{2}$/;
-  if (!fechaRegex.test(fechaSeleccionada)) {
-    alert("Formato de fecha inválido. Use el formato AAAA-MM.");
-    return;
-  }
-
-  // Mostrar indicadores de carga
   $("#loader").show();
   $("#message").text("Insertando registros, espere por favor...");
-  $("#submit").prop("disabled", true);
-  $("#inputFile").prop("disabled", true);
-  $(".provider-switches input").prop("disabled", true);
+  $("#submit, #inputFile, .provider-switches input").prop("disabled", true);
   $("#progress-bar-indicator").show();
 
-  console.log("Fecha seleccionada:", fechaSeleccionada);
   const fechaSplit = fechaSeleccionada.split("-");
   const monthNumber = Number(fechaSplit[1]);
 
-  // Configurar barra de progreso
   const progress = $(".progress-bar");
   const totalRows = globalArray.length;
   let processedRows = 0;
+  let failedRecords = [];
 
-  // Función para actualizar progreso
   function updateProgress() {
     const percentage = (processedRows / totalRows) * 100;
-    progress
-      .css("width", `${percentage}%`)
-      .attr("aria-valuenow", percentage)
-      .text(`${percentage.toFixed(2)}% completado`);
-
+    progress.css("width", `${percentage}%`).attr("aria-valuenow", percentage).text(`${percentage.toFixed(2)}% completado`);
     if (percentage >= 100) {
       progress.addClass("bg-success");
     }
   }
 
-  // Procesar cada fila
-  try {
-    for (let i = 0; i < globalArray.length; i++) {
-      const row = globalArray[i];
-      await postSite(row, monthNumber);
-
-      processedRows++;
+  async function processBatch(batch) {
+    const results = await Promise.allSettled(batch.map(row => postSite(row, monthNumber)));
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        processedRows++;
+      } else {
+        failedRecords.push(batch[index]); // Guardamos el registro fallido
+      }
       updateProgress();
+    });
+  }
 
-      // Pequeño delay para no saturar
-      await new Promise((resolve) => setTimeout(resolve, 10));
+  try {
+    // Cantidad de peticiones por lote (BATCH)
+    const batchSize = 100;
+
+    // Primera pasada
+    for (let i = 0; i < globalArray.length; i += batchSize) {
+      const batch = globalArray.slice(i, i + batchSize); 
+      await processBatch(batch);
     }
 
-    // Mostrar mensaje de éxito
-    $("#message").html(
-      `<span class="text-success">Se crearon correctamente ${totalRows} registros</span>`
-    );
-    alert(`Proceso completado: ${totalRows} registros insertados`);
+    // Reintentos
+    let retries = 0;
+    const maxRetries = 3;
 
-    // Llamar a la nueva función antes de recargar
-    try {
-      $("#message").html(
-        `<span class="text-info">Activando flujo de facturación, espere por favor...</span>`
-      );
-      await activateFactFlow();
-      console.log("Flujo de facturación activado con éxito");
-
-      // Esperar 3-4 segundos adicionales antes de recargar
-      await new Promise(resolve => setTimeout(resolve, 4000));
-    } catch (error) {
-      console.error("Error al activar el flujo:", error);
-      // Continuar con la recarga aunque falle la activación del flujo
+    while (failedRecords.length > 0 && retries < maxRetries) {
+      console.warn(`Reintento ${retries + 1} de ${maxRetries}: ${failedRecords.length} registros fallidos.`);
+      const currentFails = failedRecords;
+      failedRecords = []; // limpiar antes del nuevo intento
+      for (let i = 0; i < currentFails.length; i += batchSize) {
+        const batch = currentFails.slice(i, i + batchSize);
+        await processBatch(batch);
+      }
+      retries++;
     }
 
-    // Recargar después de completar todo
+    if (failedRecords.length > 0) {
+      console.error(`No se pudieron insertar ${failedRecords.length} registros después de ${maxRetries} intentos.`);
+    }
+
+    $("#message").html(`<span class="text-success">Proceso completado. Insertados ${processedRows} de ${totalRows} registros.</span>`);
+    alert(`Proceso completado: ${processedRows}/${totalRows} registros insertados`);
+
+    $("#message").html(`<span class="text-info">Activando flujo de facturación, espere por favor...</span>`);
+    await activateFactFlow();
+    await new Promise(resolve => setTimeout(resolve, 4000));
     location.reload();
+
   } catch (error) {
     console.error("Error en el proceso:", error);
-    $("#message").html(
-      `<span class="text-danger">Error: ${error.message}</span>`
-    );
-    alert(
-      "Ocurrió un error durante el proceso. Consulte la consola para más detalles."
-    );
+    $("#message").html(`<span class="text-danger">Error: ${error.message}</span>`);
+    alert("Ocurrió un error durante el proceso. Consulte la consola para más detalles.");
   } finally {
     $("#loader").hide();
   }
 }
+
 
 // Función para enviar datos al servidor
 async function postSite(data, number) {
@@ -164,7 +153,7 @@ async function postSite(data, number) {
       }
     );
 
-    console.log(`Registro ${data[0]} insertado. Status: ${response.status}`);
+    console.log(`Registro insertado. Status: ${response.status}`);
     return response.data;
   } catch (error) {
     console.error(`Error al insertar registro ${data[0]}:`, error);
