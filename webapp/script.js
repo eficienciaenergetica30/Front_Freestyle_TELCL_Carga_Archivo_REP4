@@ -15,6 +15,13 @@ async function getTableData() {
   $("#submit, #inputFile, .provider-switches input").prop("disabled", true);
   $("#progress-bar-indicator").show();
 
+  // Activar truncateTempElectricFact
+  await truncateTempElectricFact();
+
+  setTimeout(() => {
+    console.log("Esperando respuesta de truncateTempElectricFact");
+  }, "2000");
+
   const fechaSplit = fechaSeleccionada.split("-");
   const monthNumber = Number(fechaSplit[1]);
 
@@ -49,7 +56,7 @@ async function getTableData() {
 
     // Primera pasada
     for (let i = 0; i < globalArray.length; i += batchSize) {
-      const batch = globalArray.slice(i, i + batchSize); 
+      const batch = globalArray.slice(i, i + batchSize);
       await processBatch(batch);
     }
 
@@ -161,81 +168,109 @@ async function postSite(data, number) {
   }
 }
 
-// Activar FLujo V1
-// async function activateFactFlow() {
-//   try {
-//       const response = await axios.post('https://cf-eedev-dataintelligenceapi.cfapps.us10.hana.ondemand.com/apiActivateVFlow', {
-//           apiVFlowName: "TLCL05_Carga_Datos_Facturacion_Electrica"
-//       });
-//       console.log(response);
-//   } catch (error) {
-//       console.error(error);
-//       if (axios.isAxiosError(error)) {
-//           if (error.response && error.response.data.error) {
-//               alert(error.response.data.error);
-//           } else {
-//               alert('Error en la solicitud HTTP');
-//           }
-//       } else {
-//           alert('Error desconocido');
-//       }
-//   }
-// }
+async function truncateTempElectricFact() {
+  try {
+    const requestOptions = {
+      method: "POST",
+      redirect: "follow"
+    };
+
+    fetch("https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/truncateTempElectricFact", requestOptions)
+      .then((response) => response.text())
+      .then((result) => console.log(result))
+      .catch((error) => console.error(error));
+  } catch (error) {
+    console.error('truncateTempElectricFact error:', error);
+    throw error;
+  }
+}
 
 async function activateFactFlow() {
-  const FLOW_NAME = "TLCL01_Carga_Datos_Facturacion_Electrica_Dev";
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 2000; // 2 segundos mas o menos
-
-  let retryCount = 0;
-
-  while (retryCount < MAX_RETRIES) {
-    try {
-      const response = await axios.post(
-        'https://cf-eedev-dataintelligenceapi.cfapps.us10.hana.ondemand.com/apiActivateVFlow',
-        { apiVFlowName: FLOW_NAME },
-        {
-          timeout: 10000, // 10 segundos timeout
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
+  try {
+    const response = await axios.post(
+      'https://tlcl-processes-hub.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01',
+      {
+        p1: '?',
+        p2: '?
+        '
+      },
+      {
+        timeout: 10000, // 10 segundos timeout
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
-      );
+      }
+    );
 
-      if (response.status === 200) {
-        console.log('Flujo activado correctamente:', response.data);
-        return response.data; // Devuelve los datos para posible uso posterior
+    if (response.status === 200) {
+      const data = response.data;
+
+      console.log(response);
+      console.log('Respuesta del servicio:', data);
+
+      // Nueva estructura esperada:
+      // {
+      //   success: true,
+      //   success_flag: 1,
+      //   message: 'Proceso finalizado con éxito.',
+      //   output_params: [1, 'Proceso finalizado con éxito.'],
+      //   result_sets_count: 0
+      // }
+
+      const isSuccess = !!(data && (data.success === true || data.success_flag === 1));
+      const alertIcon = isSuccess ? 'success' : 'error';
+      const alertTitle = isSuccess ? '¡Proceso Completado!' : '¡Proceso No Completado!';
+
+      let alertMessage = '';
+      if (typeof data?.message === 'string' && data.message.trim() !== '') {
+        alertMessage = data.message;
+      } else if (Array.isArray(data?.output_params) && typeof data.output_params[1] === 'string') {
+        alertMessage = data.output_params[1];
       } else {
-        throw new Error(`Respuesta inesperada: ${response.status}`);
+        alertMessage = isSuccess ? 'Proceso finalizado con éxito.' : 'No se pudo completar el proceso.';
       }
 
-    } catch (error) {
-      retryCount++;
+      const flagValue = typeof data?.success_flag !== 'undefined'
+        ? data.success_flag
+        : (Array.isArray(data?.output_params) ? data.output_params[0] : 'N/D');
 
-      if (retryCount >= MAX_RETRIES) {
-        console.error(`Error al activar flujo después de ${MAX_RETRIES} intentos:`, error);
+      const resultSets = typeof data?.result_sets_count !== 'undefined' ? data.result_sets_count : 'N/D';
 
-        let errorMessage = 'Error desconocido';
-        if (axios.isAxiosError(error)) {
-          if (error.response) {
-            errorMessage = error.response.data?.error ||
-              `Error ${error.response.status}: ${error.response.statusText}`;
-          } else if (error.request) {
-            errorMessage = 'No se recibió respuesta del servidor';
-          } else {
-            errorMessage = `Error en la configuración de la solicitud: ${error.message}`;
-          }
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        }
+      // Mostrar alerta SweetAlert al usuario con la nueva estructura
+      Swal.fire({
+        icon: alertIcon,
+        title: alertTitle,
+        html: `
+          <div style="text-align: left;">
+            <p><strong>Status:</strong> ${alertMessage}</p>
+          </div>
+        `,
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: isSuccess ? '#28a745' : '#dc3545'
+      });
 
-        alert(`Error al activar flujo: ${errorMessage}`);
-        throw error; // Re-lanzamos el error para que pueda ser capturado por getTableData()
+      if (isSuccess) {
+        return data; // ÉXITO: Salir de la función inmediatamente
+      } else {
+        throw new Error(`API respondió sin éxito. Flag: ${flagValue}`);
       }
-
-      console.warn(`Intento ${retryCount} fallido. Reintentando en ${RETRY_DELAY / 1000} segundos...`);
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+    } else {
+      throw new Error(`Respuesta HTTP inesperada: ${response.status}`);
     }
+
+  } catch (error) {
+    console.error(error);
+    // Mostrar error al usuario
+    Swal.fire({
+      icon: 'error',
+      title: 'Error de conexión',
+      text: error?.message || 'Se produjo un error en la operación.',
+      confirmButtonText: 'Cerrar',
+      confirmButtonColor: '#dc3545'
+    });
   }
+
+  // Si llegamos aquí, significa que se agotaron todos los reintentos
+  throw new Error('Se agotaron todos los intentos de conexión');
 }
