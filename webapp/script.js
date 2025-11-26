@@ -185,6 +185,7 @@ async function truncateTempElectricFact() {
   }
 }
 
+// Funcion para ejecutar SP TLCL01
 async function activateFactFlow() {
   try {
     const response = await axios.post(
