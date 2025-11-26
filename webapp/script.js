@@ -189,7 +189,7 @@ async function truncateTempElectricFact() {
 async function activateFactFlow() {
   try {
     const response = await axios.post(
-      'https://tlcl-processes-hub.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01',
+      'https://tlcl-processes-hub-prd.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01',
       {
         p1: '?',
         p2: '?'
