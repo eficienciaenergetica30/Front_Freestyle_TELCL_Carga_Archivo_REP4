@@ -24,6 +24,10 @@ jobs:
           DEV_DI_GRAPH="TLCL01_Carga_Datos_Facturacion_Electrica_Dev"
           PRD_DI_GRAPH="TLCL01_Carga_Datos_Facturacion_Electrica_Prd"
           
+          DEV_SP_URL="https://tlcl-processes-hub.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01"
+          PRD_SP_URL="https://tlcl-processes-hub-prd.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01"
+
+          
           # Archivos a modificar
           FILES=(
             "webapp/script.js"
@@ -35,6 +39,7 @@ jobs:
               echo "Reemplazando en $file..."
               sed -i "s|${DEV_URL}|${PRD_URL}|g" "$file"
               sed -i "s|${DEV_DI_GRAPH}|${PRD_DI_GRAPH}|g" "$file"
+              sed -i "s|${DEV_SP_URL}|${PRD_SP_URL}|g" "$file"
             else
               echo "⚠️ Archivo no encontrado: $file"
             fi
