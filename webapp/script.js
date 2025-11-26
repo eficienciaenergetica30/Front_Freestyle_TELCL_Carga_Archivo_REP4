@@ -191,8 +191,7 @@ async function activateFactFlow() {
       'https://tlcl-processes-hub.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01',
       {
         p1: '?',
-        p2: '?
-        '
+        p2: '?'
       },
       {
         timeout: 10000, // 10 segundos timeout
