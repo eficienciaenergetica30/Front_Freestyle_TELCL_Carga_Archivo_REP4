@@ -1,0 +1,68 @@
+name: Replace Dev URLs with PRD URLs on Carga Archivo REP4
+
+on:
+  pull_request:
+    types: [closed] # Se activa solo cuando se cierra un PR
+    branches: 
+      - main # Se activa solo en push a main
+
+jobs:
+  replace-urls:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necesario para commits posteriores
+
+      - name: Replace URLs in files
+        run: |
+          # Define las URLs
+          DEV_URL="https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact"
+          PRD_URL="https://telcl-prd-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact"
+
+          DEV_DI_GRAPH="TLCL01_Carga_Datos_Facturacion_Electrica_Dev"
+          PRD_DI_GRAPH="TLCL01_Carga_Datos_Facturacion_Electrica_Prd"
+          
+          # Archivos a modificar
+          FILES=(
+            "webapp/script.js"
+          )
+
+          # Reemplaza DEV_URL por PRD_URL en cada archivo
+          for file in "${FILES[@]}"; do
+            if [ -f "$file" ]; then
+              echo "Reemplazando en $file..."
+              sed -i "s|${DEV_URL}|${PRD_URL}|g" "$file"
+              sed -i "s|${DEV_DI_GRAPH}|${PRD_DI_GRAPH}|g" "$file"
+            else
+              echo "⚠️ Archivo no encontrado: $file"
+            fi
+          done
+
+          # Modificar xsappname en mta.yaml
+          MTA_FILE="mta.yaml"
+          if [ -f "$MTA_FILE" ]; then
+            echo "Reemplazando xsappname en $MTA_FILE..."
+            sed -i 's|xsappname: "cargaarchivorep4_dev"|xsappname: "cargaarchivorep4_prd"|g' "$MTA_FILE"
+          else
+            echo "⚠️ Archivo no encontrado: $MTA_FILE"
+          fi
+
+          # Modificar versión en index.html
+          HTML_FILE="webapp/index.html"
+          if [ -f "$HTML_FILE" ]; then
+            echo "Reemplazando texto en span en $HTML_FILE..."
+            # Cambia <span>Dev Env</span> por <span>Prd Env</span>
+            sed -i 's|<span>Dev Env</span>|<span>Prd Env</span>|g' "$HTML_FILE"
+          else
+            echo "⚠️ Archivo no encontrado: $HTML_FILE"
+          fi
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git diff --quiet && git diff --staged --quiet || git commit -m "[Automated] Replaced DEV URLs with PRD URLs"
+          git push
