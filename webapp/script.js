@@ -10,6 +10,10 @@ async function getTableData() {
     return;
   }
 
+  const rowsRead = globalArray.length;
+  const executionId = generateHanaSysUUID();
+  const executionUser = "ELECTRIC USER";
+
   $("#loader").show();
   $("#message").text("Insertando registros, espere por favor...");
   $("#submit, #inputFile, .provider-switches input").prop("disabled", true);
@@ -26,7 +30,7 @@ async function getTableData() {
   const monthNumber = Number(fechaSplit[1]);
 
   const progress = $(".progress-bar");
-  const totalRows = globalArray.length;
+  const totalRows = rowsRead;
   let processedRows = 0;
   let failedRecords = [];
 
@@ -83,8 +87,12 @@ async function getTableData() {
     alert(`Proceso completado: ${processedRows}/${totalRows} registros insertados`);
 
     $("#message").html(`<span class="text-info">Activando flujo de facturación, espere por favor...</span>`);
-    await activateFactFlow();
-    await new Promise(resolve => setTimeout(resolve, 4000));
+    await activateFactFlow({
+      p_rows_read: rowsRead,
+      p_rows_inserted_init: processedRows,
+      p_execution_id_in: executionId,
+      p_user: executionUser
+    });
     location.reload();
 
   } catch (error) {
@@ -96,6 +104,14 @@ async function getTableData() {
   }
 }
 
+function generateHanaSysUUID() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "").toUpperCase();
+  }
+
+  const template = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+  return template.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16)).toUpperCase();
+}
 
 // Función para enviar datos al servidor
 async function postSite(data, number) {
@@ -105,8 +121,6 @@ async function postSite(data, number) {
 
     // Asegurarse de que number sea el mes correcto
     const monthNumber = parseInt(fechaSeleccionada.split("-")[1], 10);
-
-
 
     const response = await axios.post(
       "https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
@@ -186,13 +200,16 @@ async function truncateTempElectricFact() {
 }
 
 // Funcion para ejecutar SP TLCL01
-async function activateFactFlow() {
+async function activateFactFlow({ p_rows_read, p_rows_inserted_init, p_execution_id_in, p_user }) {
   try {
     const response = await axios.post(
+      // 'http://127.0.0.1:5000/tlcl-hub/tlcl01',
       'https://tlcl-processes-hub.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01',
       {
-        p1: '?',
-        p2: '?'
+        p_rows_read,
+        p_rows_inserted_init,
+        p_execution_id_in,
+        p_user
       },
       {
         timeout: 10000, // 10 segundos timeout
@@ -235,8 +252,6 @@ async function activateFactFlow() {
         ? data.success_flag
         : (Array.isArray(data?.output_params) ? data.output_params[0] : 'N/D');
 
-      const resultSets = typeof data?.result_sets_count !== 'undefined' ? data.result_sets_count : 'N/D';
-
       // Mostrar alerta SweetAlert al usuario con la nueva estructura
       Swal.fire({
         icon: alertIcon,
@@ -252,13 +267,12 @@ async function activateFactFlow() {
 
       if (isSuccess) {
         return data; // ÉXITO: Salir de la función inmediatamente
-      } else {
-        throw new Error(`API respondió sin éxito. Flag: ${flagValue}`);
       }
-    } else {
-      throw new Error(`Respuesta HTTP inesperada: ${response.status}`);
+
+      throw new Error(`API respondió sin éxito. Flag: ${flagValue}`);
     }
 
+    throw new Error(`Respuesta HTTP inesperada: ${response.status}`);
   } catch (error) {
     console.error(error);
     // Mostrar error al usuario
