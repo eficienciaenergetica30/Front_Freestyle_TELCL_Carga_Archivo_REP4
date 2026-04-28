@@ -27,6 +27,8 @@ jobs:
           DEV_SP_URL="https://tlcl-processes-hub.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01"
           PRD_SP_URL="https://tlcl-processes-hub-prd.cfapps.us10.hana.ondemand.com/tlcl-hub/tlcl01"
 
+          DEV_TRUNCATE_URL="https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/truncateTempElectricFact"
+          PRD_TRUNCATE_URL="https://telcl-prd-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/truncateTempElectricFact"
           
           # Archivos a modificar
           FILES=(
@@ -40,6 +42,7 @@ jobs:
               sed -i "s|${DEV_URL}|${PRD_URL}|g" "$file"
               sed -i "s|${DEV_DI_GRAPH}|${PRD_DI_GRAPH}|g" "$file"
               sed -i "s|${DEV_SP_URL}|${PRD_SP_URL}|g" "$file"
+              sed -i "s|${DEV_TRUNCATE_URL}|${PRD_TRUNCATE_URL}|g" "$file"
             else
               echo "⚠️ Archivo no encontrado: $file"
             fi
