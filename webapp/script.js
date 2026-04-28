@@ -132,7 +132,7 @@ async function postSite(data, number) {
     const monthNumber = parseInt(fechaSeleccionada.split("-")[1], 10);
 
     const response = await axios.post(
-      "https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
+      "https://telcl-prd-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
       {
         ClRpu: typeof data[0] == "number" ? data[0].toString() : data[0] || "",
         ClTarifa: typeof data[6] == "number" ? data[6].toString() : data[6] || "",
@@ -198,7 +198,7 @@ async function truncateTempElectricFact() {
       redirect: "follow"
     };
 
-    fetch("https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/truncateTempElectricFact", requestOptions)
+    fetch("https://telcl-prd-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/truncateTempElectricFact", requestOptions)
       .then((response) => response.text())
       .then((result) => console.log(result))
       .catch((error) => console.error(error));
