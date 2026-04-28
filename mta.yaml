@@ -85,7 +85,7 @@ resources:
       service-plan: application
       update: true
       config:
-        xsappname: "cargaarchivorep4_dev"
+        xsappname: "cargaarchivorep4_prd"
   - name: cargaarchivorep4-repo-host
     type: org.cloudfoundry.managed-service
     parameters:
