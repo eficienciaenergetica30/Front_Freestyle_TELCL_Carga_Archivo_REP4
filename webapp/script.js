@@ -83,8 +83,13 @@ async function getTableData() {
       console.error(`No se pudieron insertar ${failedRecords.length} registros después de ${maxRetries} intentos.`);
     }
 
-    $("#message").html(`<span class="text-success">Proceso completado. Insertados ${processedRows} de ${totalRows} registros.</span>`);
-    alert(`Proceso completado: ${processedRows}/${totalRows} registros insertados`);
+    const hasPartialLoad = processedRows < totalRows;
+    const processMessageClass = hasPartialLoad ? "text-warning" : "text-success";
+    const processMessageText = hasPartialLoad
+      ? `Proceso completado con observaciones. Se insertaron ${processedRows} de ${totalRows} registros.`
+      : `Proceso completado. Se insertaron ${processedRows} de ${totalRows} registros.`;
+
+    $("#message").html(`<span class="${processMessageClass}">${processMessageText}</span>`);
 
     $("#message").html(`<span class="text-info">Activando flujo de facturación, espere por favor...</span>`);
     await activateFactFlow({
@@ -113,6 +118,10 @@ function generateHanaSysUUID() {
   return template.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16)).toUpperCase();
 }
 
+function escapeHtml(value) {
+  return $("<div>").text(value || "").html();
+}
+
 // Función para enviar datos al servidor
 async function postSite(data, number) {
   try {
@@ -123,7 +132,7 @@ async function postSite(data, number) {
     const monthNumber = parseInt(fechaSeleccionada.split("-")[1], 10);
 
     const response = await axios.post(
-      "https://telcl-prd-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
+      "https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
       {
         ClRpu: typeof data[0] == "number" ? data[0].toString() : data[0] || "",
         ClTarifa: typeof data[6] == "number" ? data[6].toString() : data[6] || "",
@@ -234,9 +243,16 @@ async function activateFactFlow({ p_rows_read, p_rows_inserted_init, p_execution
       //   result_sets_count: 0
       // }
 
-      const isSuccess = !!(data && (data.success === true || data.success_flag === 1));
-      const alertIcon = isSuccess ? 'success' : 'error';
-      const alertTitle = isSuccess ? '¡Proceso Completado!' : '¡Proceso No Completado!';
+      const serviceSuccess = !!(data && (data.success === true || data.success_flag === 1));
+      const hasPartialLoad = Number(p_rows_inserted_init) < Number(p_rows_read);
+      const isWarning = serviceSuccess && hasPartialLoad;
+      const isSuccess = serviceSuccess && !hasPartialLoad;
+      const alertIcon = isWarning ? 'warning' : isSuccess ? 'success' : 'error';
+      const alertTitle = isWarning
+        ? 'Carga completada con observaciones'
+        : isSuccess
+          ? 'Proceso completado'
+          : 'Proceso no completado';
 
       let alertMessage = '';
       if (typeof data?.message === 'string' && data.message.trim() !== '') {
@@ -244,27 +260,60 @@ async function activateFactFlow({ p_rows_read, p_rows_inserted_init, p_execution
       } else if (Array.isArray(data?.output_params) && typeof data.output_params[1] === 'string') {
         alertMessage = data.output_params[1];
       } else {
-        alertMessage = isSuccess ? 'Proceso finalizado con éxito.' : 'No se pudo completar el proceso.';
+        alertMessage = serviceSuccess
+          ? 'Proceso finalizado con éxito.'
+          : 'No se pudo completar el proceso.';
       }
 
       const flagValue = typeof data?.success_flag !== 'undefined'
         ? data.success_flag
         : (Array.isArray(data?.output_params) ? data.output_params[0] : 'N/D');
 
-      // Mostrar alerta SweetAlert al usuario con la nueva estructura
-      Swal.fire({
+      const failedRows = Math.max(Number(p_rows_read) - Number(p_rows_inserted_init), 0);
+      const summaryMessage = isWarning
+        ? 'El flujo se ejecutó, pero no todos los registros leídos del archivo se cargaron al servicio.'
+        : isSuccess
+          ? 'Todos los registros leídos del archivo se cargaron correctamente al servicio.'
+          : 'No fue posible completar el flujo de facturación.';
+
+      await Swal.fire({
         icon: alertIcon,
         title: alertTitle,
+        customClass: {
+          popup: 'result-alert-popup',
+          title: 'result-alert-title',
+          confirmButton: 'result-alert-button'
+        },
+        buttonsStyling: false,
         html: `
-          <div style="text-align: left;">
-            <p><strong>Status:</strong> ${alertMessage}</p>
+          <div class="result-alert">
+            <p class="result-alert__summary">${summaryMessage}</p>
+            <div class="result-alert__metrics">
+              <div class="result-alert__metric">
+                <span>Leídos</span>
+                <strong>${p_rows_read}</strong>
+              </div>
+              <div class="result-alert__metric">
+                <span>Cargados</span>
+                <strong>${p_rows_inserted_init}</strong>
+              </div>
+              <div class="result-alert__metric ${failedRows > 0 ? 'is-warning' : ''}">
+                <span>No cargados</span>
+                <strong>${failedRows}</strong>
+              </div>
+            </div>
+            <div class="result-alert__status">
+              <span class="result-alert__status-label">Respuesta del servicio</span>
+              <p>${escapeHtml(alertMessage)}</p>
+            </div>
           </div>
         `,
         confirmButtonText: 'Entendido',
-        confirmButtonColor: isSuccess ? '#28a745' : '#dc3545'
+        allowOutsideClick: false,
+        allowEscapeKey: false
       });
 
-      if (isSuccess) {
+      if (serviceSuccess) {
         return data; // ÉXITO: Salir de la función inmediatamente
       }
 
@@ -275,12 +324,26 @@ async function activateFactFlow({ p_rows_read, p_rows_inserted_init, p_execution
   } catch (error) {
     console.error(error);
     // Mostrar error al usuario
-    Swal.fire({
+    await Swal.fire({
       icon: 'error',
       title: 'Error de conexión',
-      text: error?.message || 'Se produjo un error en la operación.',
+      html: `
+        <div class="result-alert">
+          <p class="result-alert__summary">Se produjo un error durante la operación.</p>
+          <div class="result-alert__status">
+            <span class="result-alert__status-label">Detalle</span>
+            <p>${escapeHtml(error?.message || 'Se produjo un error en la operación.')}</p>
+          </div>
+        </div>
+      `,
+      customClass: {
+        popup: 'result-alert-popup',
+        title: 'result-alert-title',
+        confirmButton: 'result-alert-button'
+      },
+      buttonsStyling: false,
       confirmButtonText: 'Cerrar',
-      confirmButtonColor: '#dc3545'
+      allowOutsideClick: false
     });
   }
 
