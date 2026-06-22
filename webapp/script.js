@@ -1,4 +1,6 @@
 // Función principal para guardar datos
+
+
 async function getTableData() {
   if (!idProvider) {
     alert("Seleccione un proveedor");
@@ -122,20 +124,27 @@ function escapeHtml(value) {
   return $("<div>").text(value || "").html();
 }
 
-// Función para enviar datos al servidor
+// Función para enviar datos al servidor (Con validación robusta de tipo de dato)
 async function postSite(data, number) {
   try {
-    const SingleDateArr1 = data[7]?.split("/") || ["", "", ""];
-    const SingleDateArr2 = data[8]?.split("/") || ["", "", ""];
+    // 1. Convertimos a String de forma segura antes de aplicar split()
+    const strDate1 = data[8] ? String(data[8]) : "";
+    const SingleDateArr1 = strDate1.includes("/") ? strDate1.split("/") : ["", "", ""];
+
+    const strDate2 = data[9] ? String(data[9]) : "";
+    const SingleDateArr2 = strDate2.includes("/") ? strDate2.split("/") : ["", "", ""];
 
     // Asegurarse de que number sea el mes correcto
     const monthNumber = parseInt(fechaSeleccionada.split("-")[1], 10);
 
+    // Validar si el proveedor es CFE para el mapeo dinámico
+    const isCFE = idProvider === "CFE";
+
     const response = await axios.post(
       "https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
       {
-        ClRpu: typeof data[0] == "number" ? data[0].toString() : data[0] || "",
-        ClTarifa: typeof data[6] == "number" ? data[6].toString() : data[6] || "",
+        ClRpu: typeof data[1] == "number" ? data[1].toString() : data[1] || "",
+        ClTarifa: typeof data[7] == "number" ? data[7].toString() : data[7] || "",
 
         AnioDesde: SingleDateArr1[2]?.toString() || "",
         MesDesde: SingleDateArr1[1]?.replace(/^0+/, "").toString() || "",
@@ -151,19 +160,26 @@ async function postSite(data, number) {
         AnioFacEnc: fechaSeleccionada.split("-")[0]?.toString() || '',
         MesFacEnc: monthNumber.toString(),
 
-        ConsResu: typeof data[9] === "number" ? data[9] : Number(data[9]) || 0,
-        Demanda: typeof data[5] === "number" ? data[5] : Number(data[5]) || 0,
-        Reactivos: typeof data[11] === "number" ? data[11] : Number(data[11]) || 0,
-        FacPot: typeof data[12] === "number" ? data[12] : Number(data[12]) || 0,
-        FacCar: typeof data[13] === "number" ? data[13] : Number(data[13]) || 0,
-        ImEnergia: data[14] || 0,
-        Iva: parseInt(data[15], 0) || 0,
-        ImDap: data[16] || 0,
-        ImCredito: data[17] || 0,
-        ImTotal: data[18] || 0,
+        ConsResu: typeof data[10] === "number" ? data[10] : Number(data[10]) || 0,
+        Demanda: typeof data[6] === "number" ? data[6] : Number(data[6]) || 0,
+        Reactivos: typeof data[12] === "number" ? data[12] : Number(data[12]) || 0,
+        FacPot: typeof data[13] === "number" ? data[13] : Number(data[13]) || 0,
+        FacCar: typeof data[14] === "number" ? data[14] : Number(data[14]) || 0,
+        ImEnergia: data[15] || 0,
+        Iva: parseInt(data[16], 10) || 0,
+        ImDap: data[17] || 0,
+        ImCredito: data[18] || 0,
+
+        // --- NUEVOS CAMPOS Y MAPEO DINÁMICO RECORRIDOS ---
+        CargosDepositos: isCFE ? (typeof data[19] === "number" ? data[19] : Number(data[19]) || 0) : null,
+        CreditosRedondeos: isCFE ? (typeof data[20] === "number" ? data[20] : Number(data[20]) || 0) : null,
+        ImTotal: isCFE ? (data[21] || 0) : (data[19] || 0),
+        TipoProceso: "MANUAL",
+        // -------------------------------------------------
+
         IdProveedor: idProvider,
-        Dem1p: typeof data[5] === "number" ? data[5] : Number(data[5]) || 0,
-        Dem2p: typeof data[10] === "number" ? data[10] : Number(data[10]) || 0,
+        Dem1p: typeof data[6] === "number" ? data[6] : Number(data[6]) || 0,
+        Dem2p: typeof data[11] === "number" ? data[11] : Number(data[11]) || 0,
 
         // Campos opcionales
         Cuenta: "",
@@ -178,7 +194,6 @@ async function postSite(data, number) {
         Dem3p: null,
         IdDivision: null,
         RMU: "",
-        IdProveedor: idProvider,
         TipoArchivo: "REP4"
       }
     );
@@ -186,7 +201,7 @@ async function postSite(data, number) {
     console.log(`Registro insertado. Status: ${response.status}`);
     return response.data;
   } catch (error) {
-    console.error(`Error al insertar registro ${data[0]}:`, error);
+    console.error(`Error al insertar registro ${data[1]}:`, error);
     throw error;
   }
 }

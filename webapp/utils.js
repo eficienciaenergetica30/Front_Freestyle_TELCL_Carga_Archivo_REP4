@@ -160,15 +160,15 @@ function processRows(arrayData) {
   for (let i = 1; i < arrayData.length; i++) {
     const row = arrayData[i];
 
-    // Ajustar formato de fechas
-    row[7] = formatDate(row[7]);
+    // Ajustar formato de fechas (Recorridos a las posiciones 8 y 9)
     row[8] = formatDate(row[8]);
+    row[9] = formatDate(row[9]);
 
     globalArray.push(row);
   }
 
-  // Calcular total de consumo
-  let suma = globalArray.reduce((total, row) => total + (row[9] || 0), 0);
+  // Calcular total de consumo (Este también se recorre del 9 al 10)
+  let suma = globalArray.reduce((total, row) => total + (row[10] || 0), 0);
   $("#totalConsumo").text("Total de consumo: " + suma);
 }
 
