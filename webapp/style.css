@@ -357,3 +357,9 @@ tr:nth-child(even) {
 .result-alert-button:hover {
   background: linear-gradient(135deg, #00458a, #0668d4);
 }
+
+.provider-option.disabled-style {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none; /* Evita que hagan click a la tarjeta completa */
+}

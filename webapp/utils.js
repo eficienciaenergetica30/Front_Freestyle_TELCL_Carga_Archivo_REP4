@@ -25,67 +25,82 @@ const monthList = [
 $(document).ready(function () {
   console.log("Last Code Update: " + new Date().toLocaleDateString());
 
-  // Proveedor
-  $(".provider-switches input").on("click", function () {
-    if ($(this).prop("disabled")) return; // Evita interacción si está bloqueado
-    selectProvider($(this).val());
-  });
-
-  // Fecha
-  $("#fecha").on("change", function () {
-    if ($(this).prop("disabled")) return; // Evita interacción si está bloqueado
-    fechaSeleccionada = $(this).val();
-    console.log("Fecha seleccionada:", fechaSeleccionada);
-  });
-
-
-  // Deshabilitar controles inicialmente
-  $(".provider-switches input, #submit").prop("disabled", true);
+  // --- 1. ESTADO INICIAL ---
+  // Bloquear todo al arrancar la página (menos el archivo)
+  $("#fecha, .provider-switches input, #submit").prop("disabled", true);
+  $('.provider-option').addClass('disabled-style'); // Estilo visual opcional para las tarjetas
   $("#progress-bar-indicator").hide();
   $("#loader").hide();
 
-  // Event listeners
-  $("#fecha").change(function () {
-    fechaSeleccionada = $(this).val();
-    console.log("Fecha seleccionada:", fechaSeleccionada);
-  });
+  // --- 2. CONTROL DE FLUJO (EVENT LISTENERS) ---
 
-  // Configurar proveedores
-  $("#flexSwitch1").click(() => selectProvider("INFRA"));
-  $("#flexSwitch2").click(() => selectProvider("CFE"));
-  $("#flexSwitch3").click(() => selectProvider("APIZACO"));
-  $("#flexSwitch4").click(() => selectProvider("ABENT"));
-
-  // Configurar botón de guardar
-  $("#submit").click(getTableData);
-
-  // Configurar input de archivo
+  // Configurar input de archivo (Paso 1 del flujo)
   $("#inputFile").change(handleFileUpload);
 
-  // Manejar el estilo de selección para los proveedores
-  $('.provider-option').click(function () {
-    $('.provider-option').removeClass('active');
-    $(this).addClass('active');
-    $(this).find('.form-check-input').prop('checked', true);
+  // Escuchar el cambio de fecha (Paso 2 del flujo)
+  $("#fecha").on("change", function () {
+    fechaSeleccionada = $(this).val();
+    console.log("Fecha seleccionada:", fechaSeleccionada);
+
+    if (fechaSeleccionada) {
+      // Si seleccionó fecha, desbloqueamos SOLAMENTE los proveedores
+      $(".provider-switches input").prop("disabled", false);
+      $('.provider-option').removeClass('disabled-style');
+    } else {
+      // Si borra la fecha, volvemos a bloquear proveedores y botón guardar
+      $(".provider-switches input, #submit").prop("disabled", true).prop('checked', false);
+      $('.provider-option').removeClass('active');
+      idProvider = "";
+    }
   });
 
-  // Asegurar que el estado activo coincida con el seleccionado
-  $('.form-check-input').change(function () {
+  // Escuchar la selección del proveedor (Paso 3 del flujo)
+  $('.provider-option').click(function () {
+    // Si el input interno está deshabilitado, no hacer nada
+    if ($(this).find('.form-check-input').prop('disabled')) return;
+
+    // Manejar clases de diseño activo
+    $('.provider-option').removeClass('active');
+    $(this).addClass('active');
+
+    // Marcar el radio button e invocar la función del proveedor
+    const $radio = $(this).find('.form-check-input');
+    $radio.prop('checked', true);
+    selectProvider($radio.val());
+
+    // Como ya hay Archivo, Fecha y Proveedor: ¡Desbloqueamos por fin el botón guardar!
+    $("#submit").prop("disabled", false);
+  });
+
+  // Asegurar consistencia si hacen click directo en el circulito del switch
+  $('.form-check-input').change(function (e) {
+    if ($(this).prop('disabled')) return;
+
     if ($(this).is(':checked')) {
       $('.provider-option').removeClass('active');
       $(this).closest('.provider-option').addClass('active');
+      selectProvider($(this).val());
+      $("#submit").prop("disabled", false);
     }
   });
+
+  // Configurar botón de guardar (Acción final)
+  $("#submit").click(getTableData);
 });
 
 // Manejar subida de archivo
 function handleFileUpload(e) {
+  // Si no hay archivo seleccionado (ej. cancelaron el cuadro de diálogo), limpiar y salir
+  if (!e.target.files || e.target.files.length === 0) {
+    cleanTable();
+    return;
+  }
+
   cleanTable();
 
   // Mostrar loader
   $('#file-loader').show();
   $('#table-container').hide();
-
 
   var TmpPath = URL.createObjectURL(e.target.files[0]);
   filePath = TmpPath;
@@ -106,23 +121,18 @@ function handleFileUpload(e) {
   $.ajax(settings).done(function (response) {
     const obj = JSON.parse(response);
 
-    // Activar controles
-    // Activar controles
-    $(".provider-switches input, #submit").prop("disabled", false);
-    $("div:nth-child(2)").prop("disabled", false);
-    $("div:nth-child(2) *").prop("disabled", false);
+    // ==========================================
+    // CAMBIO CLAVE UX: Aquí solo activamos la FECHA. 
+    // Los proveedores se quedan bloqueados hasta que elija fecha.
+    // ==========================================
+    $("#fecha").prop("disabled", false);
+    $("#fecha").focus(); // Invitamos sutilmente al usuario a interactuar con el calendario
 
-
-    if (fechaSeleccionada) {
-      const fecha = new Date(fechaSeleccionada);
-      if (isNaN(fecha.getTime())) {
-        alert("Formato de fecha inválido. Use el formato AAAA-MM.");
-        return;
-      }
-    }
-
-    // Procesar datos
+    // Procesar y renderizar datos en la tabla
     processExcelData(obj);
+  }).fail(function () {
+    $('#file-loader').hide();
+    alert("Error al procesar el archivo Excel.");
   });
 }
 
@@ -160,14 +170,11 @@ function processRows(arrayData) {
   for (let i = 1; i < arrayData.length; i++) {
     const row = arrayData[i];
 
-    // Ajustar formato de fechas (Recorridos a las posiciones 8 y 9)
-    row[8] = formatDate(row[8]);
-    row[9] = formatDate(row[9]);
-
+    // NO pre-formatear aquí, dejar los valores raw
+    // El formateo se hace en postSite según el proveedor
     globalArray.push(row);
   }
 
-  // Calcular total de consumo (Este también se recorre del 9 al 10)
   let suma = globalArray.reduce((total, row) => total + (row[10] || 0), 0);
   $("#totalConsumo").text("Total de consumo: " + suma);
 }
@@ -236,13 +243,18 @@ function setMonth(fecha) {
 }
 
 // Limpiar tabla
+// Limpiar tabla y reiniciar el flujo por completo
 function cleanTable() {
   $("#tbl-data").empty();
   $("#totalConsumo").empty();
+
+  // Bloquear todo de nuevo
   $(".provider-switches input, #submit, #fecha").prop("disabled", true);
-  $("#submit").prop("disabled", true);
+  $('.provider-option').removeClass('active');
+  $(".provider-switches input").prop('checked', false);
   $("#fecha").val("");
 
+  // Limpiar variables globales
   idProvider = "";
   globalArray = [];
   titlesTable = [];

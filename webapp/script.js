@@ -102,6 +102,7 @@ async function getTableData() {
     });
     location.reload();
 
+
   } catch (error) {
     console.error("Error en el proceso:", error);
     $("#message").html(`<span class="text-danger">Error: ${error.message}</span>`);
@@ -127,81 +128,72 @@ function escapeHtml(value) {
 // Función para enviar datos al servidor (Con validación robusta de tipo de dato)
 async function postSite(data, number) {
   try {
-    // 1. Convertimos a String de forma segura antes de aplicar split()
-    const strDate1 = data[8] ? String(data[8]) : "";
+    const isCFE = idProvider === "CFE";
+    const offset = isCFE ? 0 : -1;
+
+    // Formatear fechas sobre el índice correcto según proveedor
+    const strDate1 = formatDate(data[8 + offset]) ? String(formatDate(data[8 + offset])) : "";
     const SingleDateArr1 = strDate1.includes("/") ? strDate1.split("/") : ["", "", ""];
 
-    const strDate2 = data[9] ? String(data[9]) : "";
+    const strDate2 = formatDate(data[9 + offset]) ? String(formatDate(data[9 + offset])) : "";
     const SingleDateArr2 = strDate2.includes("/") ? strDate2.split("/") : ["", "", ""];
 
-    // Asegurarse de que number sea el mes correcto
     const monthNumber = parseInt(fechaSeleccionada.split("-")[1], 10);
-
-    // Validar si el proveedor es CFE para el mapeo dinámico
-    const isCFE = idProvider === "CFE";
 
     const response = await axios.post(
       "https://telcl-dev-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
       {
-        ClRpu: typeof data[1] == "number" ? data[1].toString() : data[1] || "",
-        ClTarifa: typeof data[7] == "number" ? data[7].toString() : data[7] || "",
+        Division: isCFE ? (data[0] || null) : null,
+        ClRpu: isCFE ? (data[1] || 0) : (data[0] || 0),
+        ClTarifa: isCFE ? (data[7] || 0) : (data[6] || 0),
 
+        // Fechas con offset
         AnioDesde: SingleDateArr1[2]?.toString() || "",
-        MesDesde: SingleDateArr1[1]?.replace(/^0+/, "").toString() || "",
+        MesDesde: SingleDateArr1[1]?.replace(/^0+/, "") || "",
         DiaDesde: SingleDateArr1[0]?.toString() || "",
 
         AnioHasta: SingleDateArr2[2]?.toString() || "",
-        MesHasta: SingleDateArr2[1]?.replace(/^0+/, "").toString() || "",
+        MesHasta: SingleDateArr2[1]?.replace(/^0+/, "") || "",
         DiaHasta: SingleDateArr2[0]?.toString() || "",
 
         AnioFac: SingleDateArr2[2]?.toString() || "",
-        MesFac: SingleDateArr2[1]?.replace(/^0+/, "").toString() || "",
+        MesFac: SingleDateArr2[1]?.replace(/^0+/, "") || "",
 
-        AnioFacEnc: fechaSeleccionada.split("-")[0]?.toString() || '',
+        AnioFacEnc: fechaSeleccionada.split("-")[0] || "",
         MesFacEnc: monthNumber.toString(),
 
-        ConsResu: typeof data[10] === "number" ? data[10] : Number(data[10]) || 0,
-        Demanda: typeof data[6] === "number" ? data[6] : Number(data[6]) || 0,
-        Reactivos: typeof data[12] === "number" ? data[12] : Number(data[12]) || 0,
-        FacPot: typeof data[13] === "number" ? data[13] : Number(data[13]) || 0,
-        FacCar: typeof data[14] === "number" ? data[14] : Number(data[14]) || 0,
-        ImEnergia: data[15] || 0,
-        Iva: parseInt(data[16], 10) || 0,
-        ImDap: data[17] || 0,
-        ImCredito: data[18] || 0,
+        // Campos numéricos también con offset
+        ConsResu: Number(data[10 + offset]) || 0,
+        Demanda: Number(data[6 + offset]) || 0,
+        Reactivos: Number(data[12 + offset]) || 0,
+        FacPot: Number(data[13 + offset]) || 0,
+        FacCar: Number(data[14 + offset]) || 0,
+        ImEnergia: data[15 + offset] || 0,
+        Iva: parseInt(data[16 + offset], 10) || 0,
 
-        // --- NUEVOS CAMPOS Y MAPEO DINÁMICO RECORRIDOS ---
-        CargosDepositos: isCFE ? (typeof data[19] === "number" ? data[19] : Number(data[19]) || 0) : null,
-        CreditosRedondeos: isCFE ? (typeof data[20] === "number" ? data[20] : Number(data[20]) || 0) : null,
+        ImDap: isCFE ? (data[17] || 0) : (data[16] || 0),
+        Others: isCFE ? null : (data[17] || 0),
+
+        CargosDepositos: isCFE ? (Number(data[19]) || 0) : null,
+        CreditosRedondeos: isCFE ? (Number(data[20]) || 0) : null,
         ImTotal: isCFE ? (data[21] || 0) : (data[19] || 0),
         TipoProceso: "MANUAL",
-        // -------------------------------------------------
 
         IdProveedor: idProvider,
-        Dem1p: typeof data[6] === "number" ? data[6] : Number(data[6]) || 0,
-        Dem2p: typeof data[11] === "number" ? data[11] : Number(data[11]) || 0,
+        Dem1p: Number(data[6 + offset]) || 0,
+        Dem2p: Number(data[11 + offset]) || 0,
 
-        // Campos opcionales
-        Cuenta: "",
-        TipoMov: "",
-        CgaContr: null,
-        ImBfp: null,
-        ImBten: null,
-        ImEnerTot: null,
-        Cons1p: null,
-        Cons2p: null,
-        Cons3p: null,
-        Dem3p: null,
-        IdDivision: null,
-        RMU: "",
-        TipoArchivo: "REP4"
+        Cuenta: "", TipoMov: "", CgaContr: null,
+        ImBfp: null, ImBten: null, ImEnerTot: null,
+        Cons1p: null, Cons2p: null, Cons3p: null,
+        Dem3p: null, IdDivision: null,
+        RMU: "", TipoArchivo: "REP4"
       }
     );
 
-    console.log(`Registro insertado. Status: ${response.status}`);
     return response.data;
   } catch (error) {
-    console.error(`Error al insertar registro ${data[1]}:`, error);
+    console.error(`Error al insertar registro:`, error);
     throw error;
   }
 }
