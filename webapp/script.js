@@ -164,7 +164,9 @@ async function postSite(data, number) {
 
         // Campos numéricos también con offset
         ConsResu: Number(data[10 + offset]) || 0,
-        Demanda: Number(data[6 + offset]) || 0,
+        // Para CFE, DEMANDA_1 (índice 6) y DEMANDA (índice 11) son columnas
+        // diferentes. La demanda facturada corresponde a la segunda.
+        Demanda: Number(data[isCFE ? 11 : 6 + offset]) || 0,
         Reactivos: Number(data[12 + offset]) || 0,
         FacPot: Number(data[13 + offset]) || 0,
         FacCar: Number(data[14 + offset]) || 0,
@@ -174,9 +176,11 @@ async function postSite(data, number) {
         ImDap: isCFE ? (data[17] || 0) : (data[16] || 0),
         Others: isCFE ? null : (data[17] || 0),
 
-        CargosDepositos: isCFE ? (Number(data[19]) || 0) : null,
-        CreditosRedondeos: isCFE ? (Number(data[20]) || 0) : null,
-        ImTotal: isCFE ? (data[21] || 0) : (data[19] || 0),
+        // Índices CFE: 18=CARGOS Y DEPOSITOS, 19=CREDITOS Y REDONDEOS,
+        // 20=TOTAL. El archivo termina en el índice 20.
+        CargosDepositos: isCFE ? (Number(data[18]) || 0) : null,
+        CreditosRedondeos: isCFE ? (Number(data[19]) || 0) : null,
+        ImTotal: isCFE ? (data[20] || 0) : (data[19] || 0),
         TipoProceso: "MANUAL",
 
         IdProveedor: idProvider,
