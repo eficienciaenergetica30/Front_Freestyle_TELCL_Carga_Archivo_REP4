@@ -1,4 +1,6 @@
 // Función principal para guardar datos
+
+
 async function getTableData() {
   if (!idProvider) {
     alert("Seleccione un proveedor");
@@ -100,6 +102,7 @@ async function getTableData() {
     });
     location.reload();
 
+
   } catch (error) {
     console.error("Error en el proceso:", error);
     $("#message").html(`<span class="text-danger">Error: ${error.message}</span>`);
@@ -122,71 +125,75 @@ function escapeHtml(value) {
   return $("<div>").text(value || "").html();
 }
 
-// Función para enviar datos al servidor
+// Función para enviar datos al servidor (Con validación robusta de tipo de dato)
 async function postSite(data, number) {
   try {
-    const SingleDateArr1 = data[7]?.split("/") || ["", "", ""];
-    const SingleDateArr2 = data[8]?.split("/") || ["", "", ""];
+    const isCFE = idProvider === "CFE";
+    const offset = isCFE ? 0 : -1;
 
-    // Asegurarse de que number sea el mes correcto
+    // Formatear fechas sobre el índice correcto según proveedor
+    const strDate1 = formatDate(data[8 + offset]) ? String(formatDate(data[8 + offset])) : "";
+    const SingleDateArr1 = strDate1.includes("/") ? strDate1.split("/") : ["", "", ""];
+
+    const strDate2 = formatDate(data[9 + offset]) ? String(formatDate(data[9 + offset])) : "";
+    const SingleDateArr2 = strDate2.includes("/") ? strDate2.split("/") : ["", "", ""];
+
     const monthNumber = parseInt(fechaSeleccionada.split("-")[1], 10);
 
     const response = await axios.post(
       "https://telcl-prd-db-cap-telcl-srv.cfapps.us10.hana.ondemand.com/dataservices/TempElectricFact",
       {
-        ClRpu: typeof data[0] == "number" ? data[0].toString() : data[0] || "",
-        ClTarifa: typeof data[6] == "number" ? data[6].toString() : data[6] || "",
+        Division: isCFE ? (data[0] || null) : null,
+        ClRpu: isCFE ? (data[1] || 0) : (data[0] || 0),
+        ClTarifa: isCFE ? (data[7] || 0) : (data[6] || 0),
 
+        // Fechas con offset
         AnioDesde: SingleDateArr1[2]?.toString() || "",
-        MesDesde: SingleDateArr1[1]?.replace(/^0+/, "").toString() || "",
+        MesDesde: SingleDateArr1[1]?.replace(/^0+/, "") || "",
         DiaDesde: SingleDateArr1[0]?.toString() || "",
 
         AnioHasta: SingleDateArr2[2]?.toString() || "",
-        MesHasta: SingleDateArr2[1]?.replace(/^0+/, "").toString() || "",
+        MesHasta: SingleDateArr2[1]?.replace(/^0+/, "") || "",
         DiaHasta: SingleDateArr2[0]?.toString() || "",
 
         AnioFac: SingleDateArr2[2]?.toString() || "",
-        MesFac: SingleDateArr2[1]?.replace(/^0+/, "").toString() || "",
+        MesFac: SingleDateArr2[1]?.replace(/^0+/, "") || "",
 
-        AnioFacEnc: fechaSeleccionada.split("-")[0]?.toString() || '',
+        AnioFacEnc: fechaSeleccionada.split("-")[0] || "",
         MesFacEnc: monthNumber.toString(),
 
-        ConsResu: typeof data[9] === "number" ? data[9] : Number(data[9]) || 0,
-        Demanda: typeof data[5] === "number" ? data[5] : Number(data[5]) || 0,
-        Reactivos: typeof data[11] === "number" ? data[11] : Number(data[11]) || 0,
-        FacPot: typeof data[12] === "number" ? data[12] : Number(data[12]) || 0,
-        FacCar: typeof data[13] === "number" ? data[13] : Number(data[13]) || 0,
-        ImEnergia: data[14] || 0,
-        Iva: parseInt(data[15], 0) || 0,
-        ImDap: data[16] || 0,
-        ImCredito: data[17] || 0,
-        ImTotal: data[18] || 0,
-        IdProveedor: idProvider,
-        Dem1p: typeof data[5] === "number" ? data[5] : Number(data[5]) || 0,
-        Dem2p: typeof data[10] === "number" ? data[10] : Number(data[10]) || 0,
+        // Campos numéricos también con offset
+        ConsResu: Number(data[10 + offset]) || 0,
+        Demanda: Number(data[6 + offset]) || 0,
+        Reactivos: Number(data[12 + offset]) || 0,
+        FacPot: Number(data[13 + offset]) || 0,
+        FacCar: Number(data[14 + offset]) || 0,
+        ImEnergia: data[15 + offset] || 0,
+        Iva: parseInt(data[16 + offset], 10) || 0,
 
-        // Campos opcionales
-        Cuenta: "",
-        TipoMov: "",
-        CgaContr: null,
-        ImBfp: null,
-        ImBten: null,
-        ImEnerTot: null,
-        Cons1p: null,
-        Cons2p: null,
-        Cons3p: null,
-        Dem3p: null,
-        IdDivision: null,
-        RMU: "",
+        ImDap: isCFE ? (data[17] || 0) : (data[16] || 0),
+        Others: isCFE ? null : (data[17] || 0),
+
+        CargosDepositos: isCFE ? (Number(data[19]) || 0) : null,
+        CreditosRedondeos: isCFE ? (Number(data[20]) || 0) : null,
+        ImTotal: isCFE ? (data[21] || 0) : (data[19] || 0),
+        TipoProceso: "MANUAL",
+
         IdProveedor: idProvider,
-        TipoArchivo: "REP4"
+        Dem1p: Number(data[6 + offset]) || 0,
+        Dem2p: Number(data[11 + offset]) || 0,
+
+        Cuenta: "", TipoMov: "", CgaContr: null,
+        ImBfp: null, ImBten: null, ImEnerTot: null,
+        Cons1p: null, Cons2p: null, Cons3p: null,
+        Dem3p: null, IdDivision: null,
+        RMU: "", TipoArchivo: "REP4"
       }
     );
 
-    console.log(`Registro insertado. Status: ${response.status}`);
     return response.data;
   } catch (error) {
-    console.error(`Error al insertar registro ${data[0]}:`, error);
+    console.error(`Error al insertar registro:`, error);
     throw error;
   }
 }
