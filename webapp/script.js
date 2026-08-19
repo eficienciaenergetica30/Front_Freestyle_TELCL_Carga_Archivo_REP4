@@ -94,13 +94,13 @@ async function getTableData() {
     $("#message").html(`<span class="${processMessageClass}">${processMessageText}</span>`);
 
     $("#message").html(`<span class="text-info">Activando flujo de facturación, espere por favor...</span>`);
-    // await activateFactFlow({
-    //   p_rows_read: rowsRead,
-    //   p_rows_inserted_init: processedRows,
-    //   p_execution_id_in: executionId,
-    //   p_user: executionUser
-    // });
-    // location.reload();
+    await activateFactFlow({
+      p_rows_read: rowsRead,
+      p_rows_inserted_init: processedRows,
+      p_execution_id_in: executionId,
+      p_user: executionUser
+    });
+    location.reload();
 
 
   } catch (error) {
@@ -145,7 +145,10 @@ async function postSite(data, number) {
       {
         Division: isCFE ? (data[0] || null) : null,
         ClRpu: isCFE ? (data[1] || 0) : (data[0] || 0),
-        ClTarifa: isCFE ? (data[7] || 0) : (data[6] || 0),
+        ClTarifa: (isCFE
+          ? String(data[7] || 0).padStart(2, "0")
+          : String(data[6] || 0).padStart(2, "0")
+        ),
 
         // Fechas con offset
         AnioDesde: SingleDateArr1[2]?.toString() || "",
