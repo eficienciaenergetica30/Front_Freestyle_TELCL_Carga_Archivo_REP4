@@ -94,13 +94,13 @@ async function getTableData() {
     $("#message").html(`<span class="${processMessageClass}">${processMessageText}</span>`);
 
     $("#message").html(`<span class="text-info">Activando flujo de facturación, espere por favor...</span>`);
-    await activateFactFlow({
-      p_rows_read: rowsRead,
-      p_rows_inserted_init: processedRows,
-      p_execution_id_in: executionId,
-      p_user: executionUser
-    });
-    location.reload();
+    // await activateFactFlow({
+    //   p_rows_read: rowsRead,
+    //   p_rows_inserted_init: processedRows,
+    //   p_execution_id_in: executionId,
+    //   p_user: executionUser
+    // });
+    // location.reload();
 
 
   } catch (error) {
@@ -171,7 +171,7 @@ async function postSite(data, number) {
         FacPot: Number(data[13 + offset]) || 0,
         FacCar: Number(data[14 + offset]) || 0,
         ImEnergia: data[15 + offset] || 0,
-        Iva: parseInt(data[16 + offset], 10) || 0,
+        Iva: isCFE ? (data[16] || 0) : (data[15] || 0),
 
         ImDap: isCFE ? (data[17] || 0) : (data[16] || 0),
         Others: isCFE ? null : (data[17] || 0),
@@ -180,7 +180,7 @@ async function postSite(data, number) {
         // 20=TOTAL. El archivo termina en el índice 20.
         CargosDepositos: isCFE ? (Number(data[18]) || 0) : null,
         CreditosRedondeos: isCFE ? (Number(data[19]) || 0) : null,
-        ImTotal: isCFE ? (data[20] || 0) : (data[19] || 0),
+        ImTotal: isCFE ? (data[20] || 0) : (data[18] || 0),
         TipoProceso: "MANUAL",
 
         IdProveedor: idProvider,
